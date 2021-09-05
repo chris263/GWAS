@@ -1,0 +1,301 @@
+---
+title: "GWAS"
+author: "Chris Simoes"
+date: "9/5/2021"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=TRUE)
+knitr::opts_chunk$set(message=FALSE)
+knitr::opts_chunk$set(cache=FALSE)
+knitr::opts_chunk$set(results="hold")
+knitr::opts_chunk$set(collapse=TRUE)
+knitr::opts_chunk$set(fig.show="hold")
+```
+
+## Objetivos
+
+Trabalhar com dados para mapeamento associativo de larga escala.
+
+### Reproducibilidade  
+Aqui esta o [README file](./README.md) para esse reporte 
+
+## Script setup  
+Checando pacotes, iniciando o arquivo README.md, definindo random seed  
+```{r Script setup, echo=FALSE}
+ip <- installed.packages()
+packages_used <- c("AlphaSimR", "rrBLUP","tidyverse", "workflowr", "here")
+
+ip <- installed.packages()
+for (package in packages_used){
+  if (!(package %in% ip[,"Package"])) install.packages(package)
+}#END packages_used
+
+here::i_am("analysis/GWAS.Rmd")
+
+source("code/addToREADME.R")
+addToREADME(paste0("## ", rmarkdown::metadata$title), append=F)
+addToREADME(c(date(), ""))
+
+packages_info <- ip[packages_used, c("Package", "Version", "Built")]
+addToREADME(c("The packages used in this script are:", "Package, Version, Built"))
+apply(packages_info, 1, function(vec) addToREADME(paste(vec, collapse=" ")))
+addToREADME("")
+
+random_seed <- 153521
+set.seed(random_seed)
+addToREADME(paste("The random seed is", random_seed))
+```
+
+## Fenótipos
+
+```{r import data, echo=FALSE}
+
+pheno<-read.table("data/GWAS_pheno.txt", header=TRUE, sep= "")
+geno<-read.table("data/GWAS_genotypes.txt", header=TRUE, sep= "")
+map<-read.table("data/GWAS_map.txt", header=TRUE, sep= "")
+
+#content=ls.str(ex)
+
+#install.packages("rrBLUP")
+#install.packages("corrplot")
+# library(rrBLUP)
+# library(corrplot)
+
+cat("Aqui vamos imprimir as primeiras linhas do arquivo fenotípico.\n")
+head(pheno)### View phenotypic data.
+cat("\nAqui está a estrutura do arquivo fenotípico.\n ")
+str(pheno) ### Check variables structure. GID and ENV needs to be factors.
+###Checking normality of the data. In theory residuals needs to be checked 
+###but in general if data are normal, residuals are normal. 
+# pdf("Figure1.pdf")
+hist(pheno$Yield, col="black",xlab="Yield",ylab="Frequency",
+     border="white",breaks=10,main="Yield Histogram") # Data seems pretty normal with some outliers. 
+# dev.off()
+```
+
+### Teste de Normalidade e removendo outliers
+
+```{r teste normalidade, echo=FALSE}
+cat("\nTeste de Normalidade dos dados.\n")
+shapiro.test(pheno$Yield)##Shapiro-Wilk test indicates that normality condition is not met. 
+
+## Let´s remove the outliers and check the normality again. 
+boxplot.yield <- boxplot(pheno$Yield,xlab="Boxplot",ylab="Yield",main="Distribuição antes de remover outliers",ylim=c(4000,9000))
+outliers <- boxplot.yield$out; outliers #10 outliers
+pheno <- pheno[-which(pheno$Yield%in%outliers),] #removing outliers. 
+cat("\nNovo teste após remover outliers.\n")
+shapiro.test(pheno$Yield)
+# After removing outliers, Shapiro-Wilk test indicates Normality.
+## When data is not normal, you can improve normality of the original phenotypic data using
+#  square root, arcsine, and log transformation methods.  
+pheno <- na.omit(pheno)## To remove all posible missing data.
+#After filtering pheno 922 observations
+boxplot.yield <- boxplot(pheno$Yield,xlab="Boxplot",ylab="Yield",main="Após remover outliers",ylim=c(4000,9000))
+```
+
+## Genotipos
+Nessa parte vamos checar os dados genotípicos e filtrar.
+Para essa situação específica estou removendo:</br>
+1 - Indivíduos com mais de 40% de dados perdidos (IM = 0.40).</br>
+2 - Marcadores com mais de 60% de dados perdidos (MM = 0.60).</br>
+3 - Indivíduos com frequencia de marcadores heterozigoto maior que 5% (H = 0.05).</br>
+Para esse trabalho estou usando aveia (oat) que é autógama, assim como o tabaco, e espero uma frequencia baixa de loci heterozigotos em linhagens.
+
+
+```{r dados genotipicos, echo=FALSE}
+cat("Imprimindo as 5 primeiras linhas e colunas do arquivo de genotipagem.\n")
+geno[1:5,1:5] ### View genotypic data.
+cat("\nImprimindo as 5 primeiras linhas e colunas do arquivo do mapa genético.\n")
+map[1:5,1:3] ### View Map data.
+
+##########################***FILTERING***###############################
+
+filter.fun <- function(geno,IM,MM,H){
+  #Remove individuals with more than a % missing data
+  individual.missing <- apply(geno,1,function(x){
+    return(length(which(is.na(x)))/ncol(geno))
+  })
+  #length(which(individual.missing>0.40)) #will tell you how many 
+  #individulas needs to be removed with 20% missing.
+  #Remove markers with % missing data
+  marker.missing <- apply(geno,2,function(x)
+  {return(length(which(is.na(x)))/nrow(geno))
+    
+  })
+  length(which(marker.missing>0.6))
+  #Remove markers herteozygous calls more than %. 
+  heteroz <- apply(geno,1,function(x){
+    return(length(which(x==0))/length(!is.na(x)))
+  })
+  
+  filter1 <- geno[which(individual.missing<IM),which(marker.missing<MM)]
+  filter2 <- filter1[,(heteroz<H)]
+  return(filter2)
+}
+
+geno.filtered <- filter.fun(geno[,1:3629],0.4,0.60,0.05)
+cat("\nImprimindo as 5 linhas do arquivo de genotipagem após filtragem.\n")
+geno.filtered[1:5,1:5];dim(geno.filtered)
+```
+
+### Imputação
+Fazer imputação melhora bastante a qalidade da análise. Caso tenha um bom genoma, recomendo usar um método paralelo, como o Beagle para imputação. Caso não seja possível, pode fazer a imputação com o rrBLUP mesmo. O algorítimo que recomendo é o EM, mas também pode fazer a imputação com a média.
+O rrBLUP também remove alelos com baixa frequencia (Minor allele frequency - MAF). Aqui estou selecionando MAF 0.05.
+
+```{r imputation, echo=FALSE}
+
+library(rrBLUP)
+Imputation <- A.mat(geno.filtered,impute.method="EM",return.imputed=T,min.MAF=0.05)
+names(Imputation)
+K.mat <- Imputation$A ### KINSHIP matrix
+geno.gwas <- Imputation$imputed #NEW geno data.
+geno.gwas[1:5,1:5]## view geno
+K.mat[1:5,1:5]## view Kinship
+heatmap(geno.gwas)
+```
+
+
+## Estrutura da População
+### Análise de componentes principais
+```{r estrutura populacao, echo=FALSE}
+geno.scale <- scale(geno.gwas,center=T,scale=F) # Data needs to be centered.
+svdgeno <- svd(geno.scale) # singular value decomposition to extract eigenvalues
+PCA <- geno.scale%*%svdgeno$v #Principal components
+cat("Aqui estão os 5 principais componentes:\n")
+PCA[1:5,1:5]
+## Screeplot to visualize the proportion of variance explained by PCA axis
+# pdf("Figure20.pdf")
+plot(round((svdgeno$d)^2/sum((svdgeno$d)^2),d=7)[1:10],type="o",main="Screeplot",xlab="PCAs",ylab="% variance")
+# dev.off()
+##Proportion of variance explained by PCA1 and PCA2
+PCA1 <- 100*round((svdgeno$d[1])^2/sum((svdgeno$d)^2),d=3); PCA1
+PCA2 <- 100*round((svdgeno$d[2])^2/sum((svdgeno$d)^2),d=3); PCA2
+### Plotting Principal components.
+# pdf("Figure3.pdf")
+plot(PCA[,1],PCA[,2],xlab=paste("Pcomp:",PCA1,"%",sep=""),ylab=paste("Pcomp:",PCA2,"%",sep=""),pch=20,cex=0.7)
+# dev.off()
+
+##############**** Meu codigo definindo numero de grupos (clusters)
+require(vegan)
+fit <- cascadeKM(scale(geno.gwas, center = TRUE,  scale = TRUE), 1, 10, iter = 1000)
+plot(fit, sortg = TRUE, grpmts.plot = TRUE)
+calinski.best <- as.numeric(which.max(fit$results[2,]))
+cat("Calinski criterion optimal number of clusters:", calinski.best, "\n") #Showing the best number of clusters
+
+
+### Plotting depending on clustering. 
+Eucl <- dist(geno.gwas) ###Euclinean distance
+fit <- hclust(Eucl,method="ward.D2")### Ward criterion makes clusters with same size.
+groups2 <- cutree(fit,k=2) ### Selecting two clusters.
+table(groups2)# Number of individuals per cluster.
+# pdf("Figure4.pdf")
+plot(PCA[,1],PCA[,2],xlab=paste("Pcomp:",PCA1,"%",sep=""),ylab=paste("Pcomp:",PCA2,"%",sep=""),pch=20,cex=0.7,col=groups2)
+legend("bottomright",c("Subpop1: 251","Subpop2: 77"),pch=20,col=(c("black","red")),lty=0,bty="n",cex=1)
+# dev.off()
+```
+
+## Combinando Genótipos e Fenótipos
+
+Agora vamos combinar os arquivos de genotipagem, mapa genético e fenotipagem.
+
+```{r genoFeno, echo=FALSE}
+
+pheno=pheno[pheno$GID%in%rownames(geno.gwas),]
+pheno$GID<-factor(as.character(pheno$GID), levels=rownames(geno.gwas)) #to assure same levels on both files
+pheno <- pheno[order(pheno$GID),]
+
+#Creating file for GWAS function from rrBLUP package
+X<-model.matrix(~-1+ENV, data=pheno)
+pheno.gwas <- data.frame(GID=pheno$GID,X,Yield=pheno$Yield)
+head(pheno.gwas) # 918 individuals and 4 environements
+
+geno.gwas <- geno.gwas[rownames(geno.gwas)%in%pheno.gwas$GID,]
+dim(geno.gwas)
+pheno.gwas <- pheno.gwas[pheno.gwas$GID%in%rownames(geno.gwas),]
+geno.gwas <- geno.gwas[rownames(geno.gwas)%in%rownames(K.mat),]
+K.mat <- K.mat[rownames(K.mat)%in%rownames(geno.gwas),colnames(K.mat)%in%rownames(geno.gwas)]
+pheno.gwas <- pheno.gwas[pheno.gwas$GID%in%rownames(K.mat),]
+
+################***MATCHING GENOTYPE AND MAP***###############
+geno.gwas<-geno.gwas[,match(map$Markers,colnames(geno.gwas))]
+head(map)
+geno.gwas <- geno.gwas[,colnames(geno.gwas)%in%map$Markers]
+map <- map[map$Markers%in%colnames(geno.gwas),]
+# add chrom and phys map
+geno.gwas2<- data.frame(mark=colnames(geno.gwas),chr=map$chrom,loc=map$loc,t(geno.gwas))
+dim(geno.gwas2)
+colnames(geno.gwas2)[4:ncol(geno.gwas2)] <- rownames(geno.gwas)
+
+head(pheno.gwas)
+geno.gwas2[1:6,1:6]
+K.mat[1:5,1:5]
+```
+
+
+## Análise de Associação
+
+
+```{r analysis, echo=FALSE}
+
+gwasresults<-GWAS(pheno.gwas,geno.gwas2, fixed=colnames(pheno.gwas)[2:5], K=NULL, plot=T,n.PC=0)
+gwasresults2<-GWAS(pheno.gwas,geno.gwas2, fixed=colnames(pheno.gwas)[2:5], K=NULL, plot=T,n.PC=6)
+gwasresults3<-GWAS(pheno.gwas,geno.gwas2, fixed=colnames(pheno.gwas)[2:5], K=K.mat, plot=T,n.PC=0)
+gwasresults4<-GWAS(pheno.gwas,geno.gwas2, fixed=colnames(pheno.gwas)[2:5], K=K.mat, plot=T,n.PC=6)
+names(gwasresults4)
+
+#The option plot=T will produce manhattan plots and q-q plots. 
+# QQ-MANHATTAN and CORRELATION PLOTS
+#Let´s see the structure
+
+str(gwasresults)
+#First 3 columns are just the information from markers and map.
+#Fourth and next columns are the results form GWAS. Those values are already
+#the  -log10 pvalues, so no more transformation needs to be done to plot them. 
+
+# QQ PLOT
+
+# pdf("Figure5.pdf",width = 7)
+par(mfrow=c(2,2))
+N <- length(gwasresults$Yield)
+expected.logvalues <- sort( -log10( c(1:N) * (1/N) ) )
+observed.logvalues <- sort( gwasresults$Yield)
+
+plot(expected.logvalues , observed.logvalues, main="Naïve model(K=NULL,n.PC=0)", 
+     xlab="expected -log pvalue ", 
+     ylab="observed -log p-values",col.main="blue",col="coral1",pch=20)
+abline(0,1,lwd=3,col="black")
+
+
+N1 <- length(gwasresults2$Yield)
+expected.logvalues1 <- sort( -log10( c(1:N1) * (1/N1) ) )
+observed.logvalues1 <- sort( gwasresults2$Yield)
+
+plot(expected.logvalues1 , observed.logvalues1, main="Q model (K=NULL,n.PC=6)", 
+     xlab="expected -log pvalue ", 
+     ylab="observed -log p-values",col.main="blue",col="coral1",pch=20)
+abline(0,1,lwd=2,col="black")
+
+
+N2 <- length(gwasresults3$Yield)
+expected.logvalues2 <- sort( -log10( c(1:N2) * (1/N2) ) )
+observed.logvalues2 <- sort( gwasresults3$Yield)
+
+plot(expected.logvalues2 , observed.logvalues2, main="K model (K=Kmat,n.PC=0)", 
+     xlab="expected -log pvalue ", 
+     ylab="observed -log p-values",col.main="blue",col="coral1",pch=20)
+abline(0,1,lwd=2,col="black")
+
+N3 <- length(gwasresults4$Yield)
+expected.logvalues3 <- sort( -log10( c(1:N3) * (1/N3) ) )
+observed.logvalues3 <- sort( gwasresults4$Yield)
+
+plot(expected.logvalues3 , observed.logvalues3, main="Q+K model (K.mat,n.PC=6)", 
+     xlab="expected -log pvalue ", 
+     ylab="observed -log p-values",col.main="blue",col="coral1",pch=20)
+abline(0,1,lwd=2,col="black")
+  
+# dev.off
+
+```
+

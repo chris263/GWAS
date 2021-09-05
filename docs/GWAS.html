@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+
+<meta name="author" content="Chris Simoes" />
+
+
+<title>GWAS</title>
+
+<script src="site_libs/header-attrs-2.10/header-attrs.js"></script>
+<script src="site_libs/jquery-1.11.3/jquery.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="site_libs/bootstrap-3.3.5/css/cosmo.min.css" rel="stylesheet" />
+<script src="site_libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/respond.min.js"></script>
+<style>h1 {font-size: 34px;}
+       h1.title {font-size: 38px;}
+       h2 {font-size: 30px;}
+       h3 {font-size: 24px;}
+       h4 {font-size: 18px;}
+       h5 {font-size: 16px;}
+       h6 {font-size: 12px;}
+       code {color: inherit; background-color: rgba(0, 0, 0, 0.04);}
+       pre:not([class]) { background-color: white }</style>
+<script src="site_libs/jqueryui-1.11.4/jquery-ui.min.js"></script>
+<link href="site_libs/tocify-1.9.1/jquery.tocify.css" rel="stylesheet" />
+<script src="site_libs/tocify-1.9.1/jquery.tocify.js"></script>
+<script src="site_libs/navigation-1.1/tabsets.js"></script>
+<link href="site_libs/highlightjs-9.12.0/textmate.css" rel="stylesheet" />
+<script src="site_libs/highlightjs-9.12.0/highlight.js"></script>
+
+<link rel="icon" href="https://github.com/workflowr/workflowr-assets/raw/master/img/reproducible.png">
+<!-- Add a small amount of space between sections. -->
+<style type="text/css">
+div.section {
+  padding-top: 12px;
+}
+</style>
+
+
+
+<style type="text/css">
+  code{white-space: pre-wrap;}
+  span.smallcaps{font-variant: small-caps;}
+  span.underline{text-decoration: underline;}
+  div.column{display: inline-block; vertical-align: top; width: 50%;}
+  div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+  ul.task-list{list-style: none;}
+    </style>
+
+<style type="text/css">code{white-space: pre;}</style>
+<script type="text/javascript">
+if (window.hljs) {
+  hljs.configure({languages: []});
+  hljs.initHighlightingOnLoad();
+  if (document.readyState && document.readyState === "complete") {
+    window.setTimeout(function() { hljs.initHighlighting(); }, 0);
+  }
+}
+</script>
+
+
+
+
+
+
+
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+img {
+  max-width:100%;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+.html-widget {
+  margin-bottom: 20px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+summary {
+  display: list-item;
+}
+pre code {
+  padding: 0;
+}
+</style>
+
+
+<style type="text/css">
+.dropdown-submenu {
+  position: relative;
+}
+.dropdown-submenu>.dropdown-menu {
+  top: 0;
+  left: 100%;
+  margin-top: -6px;
+  margin-left: -1px;
+  border-radius: 0 6px 6px 6px;
+}
+.dropdown-submenu:hover>.dropdown-menu {
+  display: block;
+}
+.dropdown-submenu>a:after {
+  display: block;
+  content: " ";
+  float: right;
+  width: 0;
+  height: 0;
+  border-color: transparent;
+  border-style: solid;
+  border-width: 5px 0 5px 5px;
+  border-left-color: #cccccc;
+  margin-top: 5px;
+  margin-right: -10px;
+}
+.dropdown-submenu:hover>a:after {
+  border-left-color: #adb5bd;
+}
+.dropdown-submenu.pull-left {
+  float: none;
+}
+.dropdown-submenu.pull-left>.dropdown-menu {
+  left: -100%;
+  margin-left: 10px;
+  border-radius: 6px 0 6px 6px;
+}
+</style>
+
+<script type="text/javascript">
+// manage active state of menu based on current page
+$(document).ready(function () {
+  // active menu anchor
+  href = window.location.pathname
+  href = href.substr(href.lastIndexOf('/') + 1)
+  if (href === "")
+    href = "index.html";
+  var menuAnchor = $('a[href="' + href + '"]');
+
+  // mark it active
+  menuAnchor.tab('show');
+
+  // if it's got a parent navbar menu mark it active as well
+  menuAnchor.closest('li.dropdown').addClass('active');
+
+  // Navbar adjustments
+  var navHeight = $(".navbar").first().height() + 15;
+  var style = document.createElement('style');
+  var pt = "padding-top: " + navHeight + "px; ";
+  var mt = "margin-top: -" + navHeight + "px; ";
+  var css = "";
+  // offset scroll position for anchor links (for fixed navbar)
+  for (var i = 1; i <= 6; i++) {
+    css += ".section h" + i + "{ " + pt + mt + "}\n";
+  }
+  style.innerHTML = "body {" + pt + "padding-bottom: 40px; }\n" + css;
+  document.head.appendChild(style);
+});
+</script>
+
+<!-- tabsets -->
+
+<style type="text/css">
+.tabset-dropdown > .nav-tabs {
+  display: inline-table;
+  max-height: 500px;
+  min-height: 44px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.tabset-dropdown > .nav-tabs > li.active:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
+  content: "&#xe258;";
+  border: none;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs > li.active {
+  display: block;
+}
+
+.tabset-dropdown > .nav-tabs > li > a,
+.tabset-dropdown > .nav-tabs > li > a:focus,
+.tabset-dropdown > .nav-tabs > li > a:hover {
+  border: none;
+  display: inline-block;
+  border-radius: 4px;
+  background-color: transparent;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li {
+  display: block;
+  float: none;
+}
+
+.tabset-dropdown > .nav-tabs > li {
+  display: none;
+}
+</style>
+
+<!-- code folding -->
+
+
+
+<style type="text/css">
+
+#TOC {
+  margin: 25px 0px 20px 0px;
+}
+@media (max-width: 768px) {
+#TOC {
+  position: relative;
+  width: 100%;
+}
+}
+
+@media print {
+.toc-content {
+  /* see https://github.com/w3c/csswg-drafts/issues/4434 */
+  float: right;
+}
+}
+
+.toc-content {
+  padding-left: 30px;
+  padding-right: 40px;
+}
+
+div.main-container {
+  max-width: 1200px;
+}
+
+div.tocify {
+  width: 20%;
+  max-width: 260px;
+  max-height: 85%;
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  div.tocify {
+    width: 25%;
+  }
+}
+
+@media (max-width: 767px) {
+  div.tocify {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.tocify ul, .tocify li {
+  line-height: 20px;
+}
+
+.tocify-subheader .tocify-item {
+  font-size: 0.90em;
+}
+
+.tocify .list-group-item {
+  border-radius: 0px;
+}
+
+
+</style>
+
+
+
+</head>
+
+<body>
+
+
+<div class="container-fluid main-container">
+
+
+<!-- setup 3col/9col grid for toc_float and main content  -->
+<div class="row">
+<div class="col-xs-12 col-sm-4 col-md-3">
+<div id="TOC" class="tocify">
+</div>
+</div>
+
+<div class="toc-content col-xs-12 col-sm-8 col-md-9">
+
+
+
+
+<div class="navbar navbar-default  navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="index.html">GWAS</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <li>
+  <a href="index.html">Home</a>
+</li>
+<li>
+  <a href="about.html">About</a>
+</li>
+<li>
+  <a href="license.html">License</a>
+</li>
+      </ul>
+      <ul class="nav navbar-nav navbar-right">
+        
+      </ul>
+    </div><!--/.nav-collapse -->
+  </div><!--/.container -->
+</div><!--/.navbar -->
+
+<div id="header">
+
+
+
+<h1 class="title toc-ignore">GWAS</h1>
+<h4 class="author">Chris Simoes</h4>
+<h4 class="date">9/5/2021</h4>
+
+</div>
+
+
+<p>
+<button type="button" class="btn btn-default btn-workflowr btn-workflowr-report" data-toggle="collapse" data-target="#workflowr-report">
+<span class="glyphicon glyphicon-list" aria-hidden="true"></span> workflowr <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span>
+</button>
+</p>
+<div id="workflowr-report" class="collapse">
+<ul class="nav nav-tabs">
+<li class="active">
+<a data-toggle="tab" href="#summary">Summary</a>
+</li>
+<li>
+<a data-toggle="tab" href="#checks"> Checks <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span> </a>
+</li>
+<li>
+<a data-toggle="tab" href="#versions">Past versions</a>
+</li>
+</ul>
+<div class="tab-content">
+<div id="summary" class="tab-pane fade in active">
+<p>
+<strong>Last updated:</strong> 2021-09-05
+</p>
+<p>
+<strong>Checks:</strong> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> 6 <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span> 1
+</p>
+<p>
+<strong>Knit directory:</strong> <code>GWAS/</code> <span class="glyphicon glyphicon-question-sign" aria-hidden="true" title="This is the local directory in which the code in this file was executed."> </span>
+</p>
+<p>
+This reproducible <a href="http://rmarkdown.rstudio.com">R Markdown</a> analysis was created with <a
+  href="https://github.com/jdblischak/workflowr">workflowr</a> (version 1.6.2). The <em>Checks</em> tab describes the reproducibility checks that were applied when the results were created. The <em>Past versions</em> tab lists the development history.
+</p>
+<hr>
+</div>
+<div id="checks" class="tab-pane fade">
+<div id="workflowr-checks" class="panel-group">
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRMarkdownfilestronguncommittedchanges"> <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span> <strong>R Markdown file:</strong> uncommitted changes </a>
+</p>
+</div>
+<div id="strongRMarkdownfilestronguncommittedchanges" class="panel-collapse collapse">
+<div class="panel-body">
+<p>The R Markdown is untracked by Git. To know which version of the R Markdown file created these results, you’ll want to first commit it to the Git repo. If you’re still working on the analysis, you can ignore this warning. When you’re finished, you can run <code>wflow_publish</code> to commit the R Markdown file and build the HTML.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongEnvironmentstrongempty"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Environment:</strong> empty </a>
+</p>
+</div>
+<div id="strongEnvironmentstrongempty" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! The global environment was empty. Objects defined in the global environment can affect the analysis in your R Markdown file in unknown ways. For reproduciblity it’s best to always run the code in an empty environment.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongSeedstrongcodesetseed20210905code"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Seed:</strong> <code>set.seed(20210905)</code> </a>
+</p>
+</div>
+<div id="strongSeedstrongcodesetseed20210905code" class="panel-collapse collapse">
+<div class="panel-body">
+<p>The command <code>set.seed(20210905)</code> was run prior to running the code in the R Markdown file. Setting a seed ensures that any results that rely on randomness, e.g. subsampling or permutations, are reproducible.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongSessioninformationstrongrecorded"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Session information:</strong> recorded </a>
+</p>
+</div>
+<div id="strongSessioninformationstrongrecorded" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! Recording the operating system, R version, and package versions is critical for reproducibility.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongCachestrongnone"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Cache:</strong> none </a>
+</p>
+</div>
+<div id="strongCachestrongnone" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Nice! There were no cached chunks for this analysis, so you can be confident that you successfully produced the results during this run.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongFilepathsstrongrelative"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>File paths:</strong> relative </a>
+</p>
+</div>
+<div id="strongFilepathsstrongrelative" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! Using relative paths to the files within your workflowr project makes it easier to run your code on other machines.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrong20cf177"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Repository version:</strong> 20cf177 </a>
+</p>
+</div>
+<div id="strongRepositoryversionstrong20cf177" class="panel-collapse collapse">
+<div class="panel-body">
+<p>
+Great! You are using Git for version control. Tracking code development and connecting the code version to the results is critical for reproducibility.
+</p>
+<p>
+The results in this page were generated with repository version 20cf177. See the <em>Past versions</em> tab to see a history of the changes made to the R Markdown and HTML files.
+</p>
+<p>
+Note that you need to be careful to ensure that all relevant files for the analysis have been committed to Git prior to generating the results (you can use <code>wflow_publish</code> or <code>wflow_git_commit</code>). workflowr only checks the R Markdown file, but you know if there are other scripts or data files that it depends on. Below is the status of the Git repository when the results were generated:
+</p>
+<pre><code>
+Ignored files:
+    Ignored:    .Rhistory
+    Ignored:    .Rproj.user/
+
+Untracked files:
+    Untracked:  analysis/GWAS.Rmd
+    Untracked:  code/addToREADME.R
+    Untracked:  data/GWAS_genotypes.txt
+    Untracked:  data/GWAS_map.txt
+    Untracked:  data/GWAS_pheno.txt
+
+</code></pre>
+<p>
+Note that any generated files, e.g. HTML, png, CSS, etc., are not included in this status report because it is ok for generated content to have uncommitted changes.
+</p>
+</div>
+</div>
+</div>
+</div>
+<hr>
+</div>
+<div id="versions" class="tab-pane fade">
+<p>
+There are no past versions. Publish this analysis with <code>wflow_publish()</code> to start tracking its development.
+</p>
+<hr>
+</div>
+</div>
+</div>
+<div id="objetivos" class="section level2">
+<h2>Objetivos</h2>
+<p>Trabalhar com dados para mapeamento associativo de larga escala.</p>
+<div id="reproducibilidade" class="section level3">
+<h3>Reproducibilidade</h3>
+<p>Aqui esta o <a href="./README.md">README file</a> para esse reporte</p>
+</div>
+</div>
+<div id="script-setup" class="section level2">
+<h2>Script setup</h2>
+<p>Checando pacotes, iniciando o arquivo README.md, definindo random seed</p>
+<pre><code>              AlphaSimR                  rrBLUP               tidyverse 
+&quot;AlphaSimR 1.0.3 4.1.1&quot;    &quot;rrBLUP 4.6.1 4.1.0&quot; &quot;tidyverse 1.3.1 4.1.0&quot; 
+              workflowr                    here 
+&quot;workflowr 1.6.2 4.1.0&quot;      &quot;here 1.0.1 4.1.0&quot; </code></pre>
+</div>
+<div id="fenótipos" class="section level2">
+<h2>Fenótipos</h2>
+<pre><code>Aqui vamos imprimir as primeiras linhas do arquivo fenotípico.
+     GID  ENV    Yield
+1 Oat179 Env1 6317.606
+2 Oat130 Env2 6335.475
+3 Oat303 Env4 7259.274
+4 Oat270 Env1 6916.124
+5 Oat202 Env4 6845.943
+6 Oat233 Env3 5750.001
+
+Aqui está a estrutura do arquivo fenotípico.
+ &#39;data.frame&#39;:  932 obs. of  3 variables:
+ $ GID  : chr  &quot;Oat179&quot; &quot;Oat130&quot; &quot;Oat303&quot; &quot;Oat270&quot; ...
+ $ ENV  : chr  &quot;Env1&quot; &quot;Env2&quot; &quot;Env4&quot; &quot;Env1&quot; ...
+ $ Yield: num  6318 6335 7259 6916 6846 ...</code></pre>
+<p><img src="figure/GWAS.Rmd/import%20data-1.png" width="672" style="display: block; margin: auto;" /></p>
+<div id="teste-de-normalidade-e-removendo-outliers" class="section level3">
+<h3>Teste de Normalidade e removendo outliers</h3>
+<pre><code>
+Teste de Normalidade dos dados.
+
+    Shapiro-Wilk normality test
+
+data:  pheno$Yield
+W = 0.99392, p-value = 0.0007821
+
+ [1] 8979.334 3944.849 3947.001 3948.641 4576.506 3942.469 8166.286 4616.835
+ [9] 4672.310 8920.055
+
+Novo teste após remover outliers.
+
+    Shapiro-Wilk normality test
+
+data:  pheno$Yield
+W = 0.99719, p-value = 0.1093</code></pre>
+<p><img src="figure/GWAS.Rmd/teste%20normalidade-1.png" width="672" style="display: block; margin: auto;" /><img src="figure/GWAS.Rmd/teste%20normalidade-2.png" width="672" style="display: block; margin: auto;" /></p>
+</div>
+</div>
+<div id="genotipos" class="section level2">
+<h2>Genotipos</h2>
+<p>Nessa parte vamos checar os dados genotípicos e filtrar. Para essa situação específica estou removendo:</br> 1 - Indivíduos com mais de 40% de dados perdidos (IM = 0.40).</br> 2 - Marcadores com mais de 60% de dados perdidos (MM = 0.60).</br> 3 - Indivíduos com frequencia de marcadores heterozigoto maior que 5% (H = 0.05).</br> Para esse trabalho estou usando aveia (oat) que é autógama, assim como o tabaco, e espero uma frequencia baixa de loci heterozigotos em linhagens.</p>
+<pre><code>Imprimindo as 5 primeiras linhas e colunas do arquivo de genotipagem.
+     Marker1 Marker2 Marker3 Marker4 Marker5
+Oat1      NA       1       1       1       1
+Oat2      -1      NA       1       1       1
+Oat3      -1       1       1       1      NA
+Oat4      -1      NA      -1       1       1
+Oat5      -1      NA      -1       1       1
+
+Imprimindo as 5 primeiras linhas e colunas do arquivo do mapa genético.
+     Markers chrom   loc
+1  Marker607    1A 16730
+2 Marker2900    1A 16730
+3 Marker1316    1A 25338
+4 Marker2297    1A 26595
+5 Marker1895    1A 27071
+
+Imprimindo as 5 linhas do arquivo de genotipagem após filtragem.
+     Marker1 Marker2 Marker3 Marker4 Marker5
+Oat1      NA       1       1       1       1
+Oat2      -1      NA       1       1       1
+Oat3      -1       1       1       1      NA
+Oat4      -1      NA      -1       1       1
+Oat5      -1      NA      -1       1       1
+[1]  328 3268</code></pre>
+<div id="imputação" class="section level3">
+<h3>Imputação</h3>
+<p>Fazer imputação melhora bastante a qalidade da análise. Caso tenha um bom genoma, recomendo usar um método paralelo, como o Beagle para imputação. Caso não seja possível, pode fazer a imputação com o rrBLUP mesmo. O algorítimo que recomendo é o EM, mas também pode fazer a imputação com a média. O rrBLUP também remove alelos com baixa frequencia (Minor allele frequency - MAF). Aqui estou selecionando MAF 0.05.</p>
+<pre><code>[1] &quot;A.mat converging:&quot;
+[1] 0.0431
+[1] 0.00647
+[1] &quot;A&quot;       &quot;imputed&quot;
+      Marker1 Marker3 Marker4   Marker5 Marker7
+Oat1 -1.44066       1       1 1.0000000      -1
+Oat2 -1.00000       1       1 1.0000000      -1
+Oat3 -1.00000       1       1 0.6753843      -1
+Oat4 -1.00000      -1       1 1.0000000      -1
+Oat5 -1.00000      -1       1 1.0000000      -1
+          Oat1         Oat2       Oat3        Oat4         Oat5
+Oat1 1.8191561  0.220454719  0.1009423  0.15218203  0.177660657
+Oat2 0.2204547  2.111943356  0.1266988  0.02978199 -0.007214392
+Oat3 0.1009423  0.126698834  1.8000414 -0.12678093 -0.126589635
+Oat4 0.1521820  0.029781989 -0.1267809  1.87520005  1.803271696
+Oat5 0.1776607 -0.007214392 -0.1265896  1.80327170  1.873595678</code></pre>
+<p><img src="figure/GWAS.Rmd/imputation-1.png" width="672" style="display: block; margin: auto;" /></p>
+</div>
+</div>
+<div id="estrutura-da-população" class="section level2">
+<h2>Estrutura da População</h2>
+<div id="análise-de-componentes-principais" class="section level3">
+<h3>Análise de componentes principais</h3>
+<pre><code>Aqui estão os 5 principais componentes:
+           [,1]       [,2]      [,3]       [,4]        [,5]
+Oat1  -6.976549  -9.824339  5.290272  -1.184019  5.00415366
+Oat2  -8.745900 -10.545057  4.730541  -8.834242 -0.02504027
+Oat3  -6.292199   3.412671  4.774038   6.657838  8.93925754
+Oat4 -19.524147   7.689386 -7.963162 -13.644082 -6.19429306
+Oat5 -19.334593   8.011715 -7.624697 -13.033030 -6.53379527
+[1] 8.6
+[1] 5.2
+Calinski criterion optimal number of clusters: 2 
+groups2
+  1   2 
+251  77 </code></pre>
+<p><img src="figure/GWAS.Rmd/estrutura%20populacao-1.png" width="672" style="display: block; margin: auto;" /><img src="figure/GWAS.Rmd/estrutura%20populacao-2.png" width="672" style="display: block; margin: auto;" /><img src="figure/GWAS.Rmd/estrutura%20populacao-3.png" width="672" style="display: block; margin: auto;" /><img src="figure/GWAS.Rmd/estrutura%20populacao-4.png" width="672" style="display: block; margin: auto;" /></p>
+</div>
+</div>
+<div id="combinando-genótipos-e-fenótipos" class="section level2">
+<h2>Combinando Genótipos e Fenótipos</h2>
+<p>Agora vamos combinar os arquivos de genotipagem, mapa genético e fenotipagem.</p>
+<pre><code>     GID ENVEnv1 ENVEnv2 ENVEnv3 ENVEnv4    Yield
+77  Oat1       0       0       1       0 6126.514
+81  Oat1       1       0       0       0 6613.542
+330 Oat1       0       0       0       1 5984.449
+417 Oat1       0       1       0       0 6855.848
+441 Oat2       0       1       0       0 5510.549
+442 Oat2       1       0       0       0 5711.477
+[1]  328 1962
+     Markers chrom   loc
+1  Marker607    1A 16730
+2 Marker2900    1A 16730
+3 Marker1316    1A 25338
+4 Marker2297    1A 26595
+5 Marker1895    1A 27071
+6 Marker2902    1A 27071
+[1] 1759  331
+     GID ENVEnv1 ENVEnv2 ENVEnv3 ENVEnv4    Yield
+77  Oat1       0       0       1       0 6126.514
+81  Oat1       1       0       0       0 6613.542
+330 Oat1       0       0       0       1 5984.449
+417 Oat1       0       1       0       0 6855.848
+441 Oat2       0       1       0       0 5510.549
+442 Oat2       1       0       0       0 5711.477
+                 mark chr   loc Oat1       Oat2 Oat3
+Marker2297 Marker2297  1A 26595   -1 -1.0000000   -1
+Marker3125 Marker3125  1A 35232    1 -1.0000000   -1
+Marker2100 Marker2100  1A 35653   -1  1.0000000    1
+Marker1797 Marker1797  1A 51943    1 -0.4259651   -1
+Marker3191 Marker3191  1A 51943   -1  1.0000000    1
+Marker1403 Marker1403  1A 56393   -1  1.0000000    1
+          Oat1         Oat2       Oat3        Oat4         Oat5
+Oat1 1.8191561  0.220454719  0.1009423  0.15218203  0.177660657
+Oat2 0.2204547  2.111943356  0.1266988  0.02978199 -0.007214392
+Oat3 0.1009423  0.126698834  1.8000414 -0.12678093 -0.126589635
+Oat4 0.1521820  0.029781989 -0.1267809  1.87520005  1.803271696
+Oat5 0.1776607 -0.007214392 -0.1265896  1.80327170  1.873595678</code></pre>
+</div>
+<div id="análise-de-associação" class="section level2">
+<h2>Análise de Associação</h2>
+<pre><code>[1] &quot;GWAS for trait: Yield&quot;
+[1] &quot;Variance components estimated. Testing markers.&quot;
+[1] &quot;GWAS for trait: Yield&quot;
+[1] &quot;Variance components estimated. Testing markers.&quot;
+[1] &quot;GWAS for trait: Yield&quot;
+[1] &quot;Variance components estimated. Testing markers.&quot;
+[1] &quot;GWAS for trait: Yield&quot;
+[1] &quot;Variance components estimated. Testing markers.&quot;
+[1] &quot;mark&quot;  &quot;chr&quot;   &quot;loc&quot;   &quot;Yield&quot;
+&#39;data.frame&#39;:   1759 obs. of  4 variables:
+ $ mark : chr  &quot;Marker2297&quot; &quot;Marker3125&quot; &quot;Marker2100&quot; &quot;Marker1797&quot; ...
+ $ chr  : chr  &quot;1A&quot; &quot;1A&quot; &quot;1A&quot; &quot;1A&quot; ...
+ $ loc  : int  26595 35232 35653 51943 51943 56393 66313 68829 69872 70102 ...
+ $ Yield: num  0.325 0.451 0.588 0.187 0.861 ...</code></pre>
+<p><img src="figure/GWAS.Rmd/analysis-1.png" width="672" style="display: block; margin: auto;" /><img src="figure/GWAS.Rmd/analysis-2.png" width="672" style="display: block; margin: auto;" /><img src="figure/GWAS.Rmd/analysis-3.png" width="672" style="display: block; margin: auto;" /></p>
+<br>
+<p>
+<button type="button" class="btn btn-default btn-workflowr btn-workflowr-sessioninfo" data-toggle="collapse" data-target="#workflowr-sessioninfo" style="display: block;">
+<span class="glyphicon glyphicon-wrench" aria-hidden="true"></span> Session information
+</button>
+</p>
+<div id="workflowr-sessioninfo" class="collapse">
+<pre class="r"><code>sessionInfo()
+R version 4.1.1 (2021-08-10)
+Platform: x86_64-w64-mingw32/x64 (64-bit)
+Running under: Windows 10 x64 (build 19043)
+
+Matrix products: default
+
+locale:
+[1] LC_COLLATE=English_United States.1252 
+[2] LC_CTYPE=English_United States.1252   
+[3] LC_MONETARY=English_United States.1252
+[4] LC_NUMERIC=C                          
+[5] LC_TIME=English_United States.1252    
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods   base     
+
+other attached packages:
+[1] vegan_2.5-7     lattice_0.20-44 permute_0.9-5   rrBLUP_4.6.1   
+
+loaded via a namespace (and not attached):
+ [1] Rcpp_1.0.7       highr_0.9        pillar_1.6.2     compiler_4.1.1  
+ [5] bslib_0.3.0      later_1.3.0      jquerylib_0.1.4  git2r_0.28.0    
+ [9] workflowr_1.6.2  tools_4.1.1      bit_4.0.4        digest_0.6.27   
+[13] nlme_3.1-152     jsonlite_1.7.2   evaluate_0.14    lifecycle_1.0.0 
+[17] tibble_3.1.3     mgcv_1.8-36      pkgconfig_2.0.3  rlang_0.4.11    
+[21] Matrix_1.3-4     parallel_4.1.1   yaml_2.2.1       xfun_0.25       
+[25] fastmap_1.1.0    cluster_2.1.2    stringr_1.4.0    knitr_1.33      
+[29] fs_1.5.0         vctrs_0.3.8      sass_0.4.0       hms_1.1.0       
+[33] grid_4.1.1       tidyselect_1.1.1 bit64_4.0.5      rprojroot_2.0.2 
+[37] glue_1.4.2       here_1.0.1       R6_2.5.1         fansi_0.5.0     
+[41] vroom_1.5.4      rmarkdown_2.10   purrr_0.3.4      readr_2.0.1     
+[45] tzdb_0.1.2       magrittr_2.0.1   splines_4.1.1    MASS_7.3-54     
+[49] promises_1.2.0.1 ellipsis_0.3.2   htmltools_0.5.2  httpuv_1.6.2    
+[53] utf8_1.2.2       stringi_1.7.4    crayon_1.4.1    </code></pre>
+</div>
+</div>
+
+
+<!-- Adjust MathJax settings so that all math formulae are shown using
+TeX fonts only; see
+http://docs.mathjax.org/en/latest/configuration.html.  This will make
+the presentation more consistent at the cost of the webpage sometimes
+taking slightly longer to load. Note that this only works because the
+footer is added to webpages before the MathJax javascript. -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    "HTML-CSS": { availableFonts: ["TeX"] }
+  });
+</script>
+
+
+
+
+</div>
+</div>
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.odd').parent('tbody').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- tabsets -->
+
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+
+$(document).ready(function () {
+  $('.tabset-dropdown > .nav-tabs > li').click(function () {
+    $(this).parent().toggleClass('nav-tabs-open');
+  });
+});
+</script>
+
+<!-- code folding -->
+
+<script>
+$(document).ready(function ()  {
+
+    // temporarily add toc-ignore selector to headers for the consistency with Pandoc
+    $('.unlisted.unnumbered').addClass('toc-ignore')
+
+    // move toc-ignore selectors from section div to header
+    $('div.section.toc-ignore')
+        .removeClass('toc-ignore')
+        .children('h1,h2,h3,h4,h5').addClass('toc-ignore');
+
+    // establish options
+    var options = {
+      selectors: "h1,h2,h3",
+      theme: "bootstrap3",
+      context: '.toc-content',
+      hashGenerator: function (text) {
+        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_');
+      },
+      ignoreSelector: ".toc-ignore",
+      scrollTo: 0
+    };
+    options.showAndHide = true;
+    options.smoothScroll = true;
+
+    // tocify
+    var toc = $("#TOC").tocify(options).data("toc-tocify");
+});
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>
